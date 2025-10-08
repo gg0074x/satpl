@@ -7,110 +7,133 @@ impl Lexer {
     }
 
     pub fn tokenize(&mut self, code: &str) -> Vec<Tokens> {
-        let code: Vec<&str> = code.split_whitespace().collect();
         let mut tokens: Vec<Tokens> = vec![];
-        for str in code {
+
+        let mut str: String = code.to_string();
+
+        while !str.is_empty() {
+            println!("{str}");
+
             let length = tokens.len();
-            let mut str: String = str.to_string();
-
-            if let Ok((token, left)) = self.try_match_keyword(&str) {
+            if let Some((token, left)) = self.try_match_literal(&str) {
                 tokens.push(token);
                 str = left;
             }
 
-            if let Ok((token, left)) = self.try_match_literal(&str) {
+            if let Some((token, left)) = self.try_match_operator(&str) {
                 tokens.push(token);
                 str = left;
             }
 
-            if let Ok((token, left)) = self.try_match_operator(&str) {
+            if let Some((token, left)) = self.try_match_punctuation(&str) {
                 tokens.push(token);
                 str = left;
             }
 
-            if let Ok((token, left)) = self.try_match_punctuation(&str) {
+            if let Some((token, left)) = self.try_match_keyword(&str) {
                 tokens.push(token);
                 str = left;
             }
 
-            if tokens.len() == length {
-                tokens.push(Tokens::Identifier(str));
+            if let Some((token, left)) = self.try_match_keyword(&str) {
+                tokens.push(token);
+                str = left;
+            }
+
+            if tokens.len() == length
+                && let Some((token, left)) = self.make_identifier(&str)
+            {
+                tokens.push(token);
+                str = left;
             }
         }
 
         tokens
     }
 
-    fn try_match_keyword(&mut self, str: &str) -> Result<(Tokens, String), String> {
-        let (text, left) = self.until_non_alpha(str).ok_or(str)?;
+    fn try_match_keyword(&mut self, str: &str) -> Option<(Tokens, String)> {
+        let (text, left) = self.until_non_alpha(str)?;
 
         match text.as_str() {
-            "fun" => Ok((Tokens::Keywords(Keyword::Function), left)),
-            "mut" => Ok((Tokens::Keywords(Keyword::Mutable), left)),
-            "let" => Ok((Tokens::Keywords(Keyword::Variable), left)),
-            _ => Err(str.to_string()),
+            "fun" => Some((Tokens::Keywords(Keyword::Function), left)),
+            "mut" => Some((Tokens::Keywords(Keyword::Mutable), left)),
+            "let" => Some((Tokens::Keywords(Keyword::Variable), left)),
+            _ => None,
         }
     }
 
-    fn try_match_operator(&mut self, str: &str) -> Result<(Tokens, String), String> {
-        let (text, left) = self.until_alpha(str).ok_or(str)?;
+    fn try_match_operator(&mut self, str: &str) -> Option<(Tokens, String)> {
+        let (text, left) = self.until_alpha(str, 2)?;
 
         match text.as_str() {
-            "+" => Ok((Tokens::Operators(Operator::Add), left)),
-            "-" => Ok((Tokens::Operators(Operator::Sub), left)),
-            "*" => Ok((Tokens::Operators(Operator::Mul), left)),
-            "/" => Ok((Tokens::Operators(Operator::Div), left)),
-            "%" => Ok((Tokens::Operators(Operator::Modulo), left)),
-            "=" => Ok((Tokens::Operators(Operator::Equal), left)),
-            "==" => Ok((Tokens::Operators(Operator::EqualEqual), left)),
-            ">=" => Ok((Tokens::Operators(Operator::GreaterEqual), left)),
-            "<=" => Ok((Tokens::Operators(Operator::LessEqual), left)),
-            ">" => Ok((Tokens::Operators(Operator::Greater), left)),
-            "<" => Ok((Tokens::Operators(Operator::Less), left)),
-            "!" => Ok((Tokens::Operators(Operator::Negative), left)),
-            "&&" => Ok((Tokens::Operators(Operator::And), left)),
-            "||" => Ok((Tokens::Operators(Operator::Or), left)),
-            _ => Err(str.to_string()),
+            "+" => Some((Tokens::Operators(Operator::Add), left)),
+            "-" => Some((Tokens::Operators(Operator::Sub), left)),
+            "*" => Some((Tokens::Operators(Operator::Mul), left)),
+            "/" => Some((Tokens::Operators(Operator::Div), left)),
+            "%" => Some((Tokens::Operators(Operator::Modulo), left)),
+            "=" => Some((Tokens::Operators(Operator::Equal), left)),
+            "==" => Some((Tokens::Operators(Operator::EqualEqual), left)),
+            ">=" => Some((Tokens::Operators(Operator::GreaterEqual), left)),
+            "<=" => Some((Tokens::Operators(Operator::LessEqual), left)),
+            ">" => Some((Tokens::Operators(Operator::Greater), left)),
+            "<" => Some((Tokens::Operators(Operator::Less), left)),
+            "!" => Some((Tokens::Operators(Operator::Negative), left)),
+            "&&" => Some((Tokens::Operators(Operator::And), left)),
+            "||" => Some((Tokens::Operators(Operator::Or), left)),
+            _ => None,
         }
     }
 
-    fn try_match_punctuation(&mut self, str: &str) -> Result<(Tokens, String), String> {
-        let (text, left) = self.until_alpha(str).ok_or(str)?;
+    fn try_match_punctuation(&mut self, str: &str) -> Option<(Tokens, String)> {
+        let (text, left) = self.until_alpha(str, 1)?;
 
         match text.as_str() {
-            "," => Ok((Tokens::Punctuations(Punctuation::Comma), left)),
-            ":" => Ok((Tokens::Punctuations(Punctuation::Colon), left)),
-            ";" => Ok((Tokens::Punctuations(Punctuation::SemiColon), left)),
-            "." => Ok((Tokens::Punctuations(Punctuation::Dot), left)),
-            "(" => Ok((Tokens::Punctuations(Punctuation::OpenParent), left)),
-            ")" => Ok((Tokens::Punctuations(Punctuation::CloseParent), left)),
-            "{" => Ok((Tokens::Punctuations(Punctuation::OpenCurlyBracket), left)),
-            "}" => Ok((Tokens::Punctuations(Punctuation::CloseCutlyBracket), left)),
-            "[" => Ok((Tokens::Punctuations(Punctuation::OpenSquareBracket), left)),
-            "]" => Ok((Tokens::Punctuations(Punctuation::CloseSquareBracket), left)),
-            _ => Err(str.to_string()),
+            "," => Some((Tokens::Punctuations(Punctuation::Comma), left)),
+            ":" => Some((Tokens::Punctuations(Punctuation::Colon), left)),
+            ";" => Some((Tokens::Punctuations(Punctuation::SemiColon), left)),
+            "." => Some((Tokens::Punctuations(Punctuation::Dot), left)),
+            "(" => Some((Tokens::Punctuations(Punctuation::OpenParent), left)),
+            ")" => Some((Tokens::Punctuations(Punctuation::CloseParent), left)),
+            "{" => Some((Tokens::Punctuations(Punctuation::OpenCurlyBracket), left)),
+            "}" => Some((Tokens::Punctuations(Punctuation::CloseCutlyBracket), left)),
+            "[" => Some((Tokens::Punctuations(Punctuation::OpenSquareBracket), left)),
+            "]" => Some((Tokens::Punctuations(Punctuation::CloseSquareBracket), left)),
+            _ => None,
         }
     }
 
-    fn try_match_literal(&mut self, str: &str) -> Result<(Tokens, String), String> {
-        let (text, left) = self.until_non_alpha(str).ok_or(str)?;
+    fn try_match_literal(&mut self, str: &str) -> Option<(Tokens, String)> {
+        let (text, left) = self.until_non_alpha(str)?;
 
         if text.chars().all(char::is_numeric) {
-            return Ok((Tokens::Literals(Literal::Integer(text)), left));
+            return Some((Tokens::Literals(Literal::Integer(text)), left));
         }
 
         if text.starts_with('"') && text.ends_with('"') {
-            return Ok((Tokens::Literals(Literal::String(text)), left));
+            return Some((Tokens::Literals(Literal::String(text)), left));
         }
 
-        Err(str.to_string())
+        None
+    }
+
+    fn make_identifier(&mut self, str: &str) -> Option<(Tokens, String)> {
+        let (text, left) = self.until_non_alpha(str)?;
+
+        Some((Tokens::Identifier(text), left))
     }
 
     // helper functions
 
-    fn until_alpha(&mut self, str: &str) -> Option<(String, String)> {
+    fn until_alpha(&mut self, str: &str, max_chars: usize) -> Option<(String, String)> {
         let mut string: String = String::new();
         for c in str.chars() {
+            if string.len() == max_chars {
+                break;
+            }
+
+            if c.is_whitespace() {
+                break;
+            }
             if c.is_alphanumeric() {
                 break;
             }
@@ -122,6 +145,7 @@ impl Lexer {
         }
 
         let left = str.trim_prefix(string.clone().as_str()).to_string();
+        let left = Lexer::trim_whitespace(&left);
 
         Some((string, left))
     }
@@ -130,6 +154,9 @@ impl Lexer {
         let mut string = String::new();
 
         for c in str.chars() {
+            if c.is_whitespace() {
+                break;
+            }
             if c.is_alphanumeric() {
                 string.push(c);
             } else {
@@ -141,13 +168,30 @@ impl Lexer {
         }
 
         let left = str.trim_prefix(string.clone().as_str()).to_string();
+        let left = Lexer::trim_whitespace(&left);
 
         Some((string, left))
+    }
+
+    fn trim_whitespace(s: &str) -> String {
+        let mut string = String::new();
+        let mut pos = 0;
+
+        for c in s.chars() {
+            if c.is_whitespace() {
+                pos += 1;
+                string = s[pos..].to_string();
+            } else {
+                break;
+            }
+        }
+
+        if pos > 0 { string } else { s.to_string() }
     }
 }
 
 #[derive(Debug)]
-enum Tokens {
+pub enum Tokens {
     Keywords(Keyword),
     Identifier(String),
     Literals(Literal),
@@ -156,20 +200,20 @@ enum Tokens {
 }
 
 #[derive(Debug)]
-enum Keyword {
+pub enum Keyword {
     Function,
     Variable,
     Mutable,
 }
 
 #[derive(Debug)]
-enum Literal {
+pub enum Literal {
     Integer(String), // 3
     String(String),  // "Hello world"
 }
 
 #[derive(Debug)]
-enum Operator {
+pub enum Operator {
     Add,          // +
     Sub,          // -
     Mul,          // *
@@ -187,7 +231,7 @@ enum Operator {
 }
 
 #[derive(Debug)]
-enum Punctuation {
+pub enum Punctuation {
     Comma,              // ,
     Colon,              // :
     SemiColon,          // ;
@@ -207,7 +251,7 @@ mod lexer_tests {
     #[test]
     fn test() {
         let mut lexer = Lexer::new();
-        let code = lexer.tokenize("let a = 10;");
+        let code = lexer.tokenize("let a = 4 * (2-10);");
         println!("{code:?}");
         assert_eq!(true, true);
     }
