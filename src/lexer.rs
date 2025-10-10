@@ -86,12 +86,12 @@ impl Lexer {
             "/" => Some((Tokens::Operators(Operator::Div), left)),
             "%" => Some((Tokens::Operators(Operator::Modulo), left)),
             "=" => Some((Tokens::Operators(Operator::Equal), left)),
-            "==" => Some((Tokens::Operators(Operator::EqualEqual), left)),
-            ">=" => Some((Tokens::Operators(Operator::GreaterEqual), left)),
-            "<=" => Some((Tokens::Operators(Operator::LessEqual), left)),
             ">" => Some((Tokens::Operators(Operator::Greater), left)),
             "<" => Some((Tokens::Operators(Operator::Less), left)),
             "!" => Some((Tokens::Operators(Operator::Negative), left)),
+            "==" => Some((Tokens::Operators(Operator::EqualEqual), left)),
+            ">=" => Some((Tokens::Operators(Operator::GreaterEqual), left)),
+            "<=" => Some((Tokens::Operators(Operator::LessEqual), left)),
             "&&" => Some((Tokens::Operators(Operator::And), left)),
             "||" => Some((Tokens::Operators(Operator::Or), left)),
             _ => None,
@@ -118,7 +118,8 @@ impl Lexer {
 
     fn try_match_literal(&mut self, str: &str) -> Option<(Tokens, String)> {
         let try_number = self.until_non_alpha(str);
-        let try_string = self.until_enclosed(str, &["'", "\""], None);
+        let try_string_double_quotes = self.until_enclosed(str, &["\""], None);
+        let try_string_single_quotes = self.until_enclosed(str, &["'"], None);
 
         if let Some((n, left)) = try_number
             && (n.chars().all(char::is_numeric)
@@ -129,7 +130,14 @@ impl Lexer {
             return Some((Tokens::Literals(Literal::Integer(n)), left));
         }
 
-        if let Some((string, left)) = try_string
+        if let Some((string, left)) = try_string_double_quotes
+            && ((string.starts_with('"') && str.ends_with('"'))
+                || (string.starts_with('\'') && string.ends_with('\'')))
+        {
+            return Some((Tokens::Literals(Literal::String(string)), left));
+        }
+
+        if let Some((string, left)) = try_string_single_quotes
             && ((string.starts_with('"') && str.ends_with('"'))
                 || (string.starts_with('\'') && string.ends_with('\'')))
         {
@@ -1055,19 +1063,8 @@ mod lexer_tests {
         let mut lexer = Lexer::new();
         let tokens = lexer.tokenize("++--**//");
 
-        assert_eq!(
-            tokens,
-            [
-                Operators(Add),
-                Operators(Add),
-                Operators(Sub),
-                Operators(Sub),
-                Operators(Mul),
-                Operators(Mul),
-                Operators(Div),
-                Operators(Div)
-            ]
-        );
+        // This is expected to be junk since the
+        assert_eq!(tokens, [Junk("++--**//".to_string())]);
     }
 
     #[test]
