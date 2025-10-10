@@ -1,4 +1,4 @@
-use std::str::pattern::Pattern;
+use std::str::pattern::{Pattern, ReverseSearcher};
 
 #[derive(Debug)]
 pub struct Lexer;
@@ -118,7 +118,7 @@ impl Lexer {
 
     fn try_match_literal(&mut self, str: &str) -> Option<(Tokens, String)> {
         let try_number = self.until_non_alpha(str);
-        let try_string = self.until_first_and_last(str, ['\'', '"'], None);
+        let try_string = self.until_enclosed(str, &["'", "\""], None);
 
         if let Some((n, left)) = try_number
             && (n.chars().all(char::is_numeric)
@@ -146,11 +146,14 @@ impl Lexer {
     }
 
     fn make_comment(&mut self, str: &str) -> Option<(Tokens, String)> {
-        println!("{str}");
-        let (text, left) = self.until_enclosed_or_eol(str, &["//", "/*"], Some(&["*/"]))?;
-        println!("{text}");
+        let line_comment = self.until_eol(str, "//");
+        let multiline_comment = self.until_enclosed(str, &["/*"], Some(&["*/"]));
 
-        if (text.starts_with("//")) || (text.starts_with("/*") && text.ends_with("*/")) {
+        if let Some((text, left)) = line_comment {
+            return Some((Tokens::Comment, left));
+        }
+
+        if let Some((text, left)) = multiline_comment {
             return Some((Tokens::Comment, left));
         }
 
@@ -171,7 +174,7 @@ impl Lexer {
 
     // helper functions
 
-    fn until_alpha(&mut self, str: &str, limit: Option<usize>) -> Option<(String, String)> {
+    fn until_alpha(&self, str: &str, limit: Option<usize>) -> Option<(String, String)> {
         let mut string: String = String::new();
         for c in str.chars() {
             if let Some(limit) = limit
@@ -199,7 +202,7 @@ impl Lexer {
         Some((string, left))
     }
 
-    fn until_non_alpha(&mut self, str: &str) -> Option<(String, String)> {
+    fn until_non_alpha(&self, str: &str) -> Option<(String, String)> {
         let mut string = String::new();
 
         for c in str.chars() {
@@ -254,29 +257,26 @@ impl Lexer {
         Some((string, left))
     }
 
-    fn until_first_and_last<T: Pattern + Copy>(
-        &mut self,
+    fn until_enclosed(
+        &self,
         str: &str,
-        first: T,
-        last: Option<T>,
+        first: &[&str],
+        last: Option<&[&str]>,
     ) -> Option<(String, String)> {
         let mut string = String::new();
 
-        let match_first = str.chars().next()?;
-        string.push(match_first);
-        let match_first = first.is_contained_in(&match_first.to_string());
+        let left = first
+            .iter()
+            .find_map(|prefix| prefix.strip_prefix_of(str))?;
 
-        if !match_first {
-            return None;
-        }
-
-        let left = &str[1..];
+        string.push_str(str.trim_suffix(left));
 
         let last = last.unwrap_or(first);
 
         for c in left.chars() {
             string.push(c);
-            if last.is_contained_in(&c.to_string()) {
+
+            if last.iter().any(|suffix| suffix.is_suffix_of(&string)) {
                 break;
             }
         }
@@ -290,34 +290,18 @@ impl Lexer {
         Some((string, left))
     }
 
-    fn until_enclosed_or_eol(
-        &mut self,
-        str: &str,
-        prefix: &[&str],
-        suffix: Option<&[&str]>,
-    ) -> Option<(String, String)> {
+    fn until_eol(&self, str: &str, prefix: impl Pattern + Copy) -> Option<(String, String)> {
         let mut string = String::new();
 
-        if prefix
-            .iter()
-            .all(|prefix| str.strip_prefix(prefix).is_none())
-        {
+        if !prefix.is_prefix_of(str) {
             return None;
         }
-
-        let suffix = suffix.unwrap_or(prefix);
 
         for c in str.chars() {
             if c == '\n' {
                 break;
             }
             string.push(c);
-            if suffix
-                .iter()
-                .any(|suffix| string.strip_suffix(suffix).is_some())
-            {
-                break;
-            }
         }
         if string.is_empty() {
             return None;
@@ -931,7 +915,7 @@ mod lexer_tests {
         );
 
         // Multi-line comment
-        let tokens = lexer.tokenize("let /* comment */ y = 10;");
+        let tokens = lexer.tokenize("let /* \ncomment\n */ y = 10;");
         assert_eq!(
             tokens,
             [
