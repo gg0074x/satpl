@@ -1063,7 +1063,7 @@ mod lexer_tests {
         let mut lexer = Lexer::new();
         let tokens = lexer.tokenize("++--**//");
 
-        // This is expected to be junk since the
+        // This is expected to be junk since the operators have no meaning in this pattern
         assert_eq!(tokens, [Junk("++--**//".to_string())]);
     }
 
